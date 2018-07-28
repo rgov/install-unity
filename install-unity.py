@@ -947,6 +947,7 @@ def generate_tx_id():
 
 def submit_request(reqxml, token, tx_id):
     url = ACTIVATION_REQUEST_URL.replace('{TX_ID}', tx_id)
+    print url
     headers = {
         # 'X-UNITY_VERSION': '2018.2.0f2',
         'AUTHORIZATION': 'Bearer ' + token,
@@ -965,6 +966,7 @@ def submit_request(reqxml, token, tx_id):
       </Survey>
     </Transaction>
     ''')
+    print 'Response from request submission:', response.encode('hex')
     if response.strip() != expected.strip():
         print 'Warning: unexpected response from activation server:'
         print response.strip()
@@ -972,6 +974,7 @@ def submit_request(reqxml, token, tx_id):
 
 def complete_transaction(token, tx_id):
     url = ACTIVATION_TRANSACTION_URL.replace('{TX_ID}', tx_id)
+    print url
     data = json.dumps({
         "transaction": {
             "serial": {
@@ -986,14 +989,17 @@ def complete_transaction(token, tx_id):
     req = urllib2.Request(url, data, headers)
     req.get_method = lambda: 'PUT'
     f = urllib2.urlopen(req, context=sslctx)
-    response = json.load(f)
+    txt = f.read()
+    response = json.loads(txt)
     f.close()
+    print 'Response from transaction:', txt.encode('hex')
     # TODO: Do we want to validate anything? If there's an incomplete survey,
     # then we might not be ready yet.
     return response['transaction']['rx']
 
 def request_license(reqxml, token, tx_id, rx_id):
     url = ACTIVATION_LICENSE_URL.replace('{TX_ID}', tx_id).replace('{RX_ID}', rx_id)
+    print url
     headers = {
         'AUTHORIZATION': 'Bearer ' + token,
         'Content-Type': 'text/xml',
@@ -1011,19 +1017,24 @@ def activate(unity, email, password):
 
     print 'Obtaining access token for', email
     token = get_access_token(email, password)
+    print 'Token:', token
 
     print 'Asking Unity to generate activation request'
     reqxml = get_activation_request(unity, email, password)
+    print 'Request XML:', reqxml
 
     print 'Submitting activation request'
     tx_id = generate_tx_id()
+    print 'TX ID:', tx_id
     submit_request(reqxml, token, tx_id)
 
     print 'Completing activation transaction'
     rx_id = complete_transaction(token, tx_id)
+    print 'RX ID:', rx_id
 
     print 'Requesting license file'
     license = request_license(reqxml, token, tx_id, rx_id)
+    print 'License:', license.encode('hex')
 
     print 'Writing license file to', LICENSE_FILE
     if not os.path.isdir(os.path.dirname(LICENSE_FILE)):
